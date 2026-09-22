@@ -1,0 +1,1763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Greencastle Chess Club — Meetup Director & Big Screen Dashboard</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            chess: {
+              dark: '#0f172a',
+              card: '#1e293b',
+              border: '#334155',
+              boardWhite: '#f0d9b5',
+              boardBlack: '#b58863',
+              gold: '#f59e0b',
+              goldHover: '#d97706'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Confetti script -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <style>
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: #1e293b;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 3px;
+    }
+    .pulse-glow {
+      box-shadow: 0 0 25px rgba(245, 158, 11, 0.45);
+    }
+    .timer-critical {
+      color: #ef4444 !important;
+      text-shadow: 0 0 30px rgba(239, 68, 68, 0.8);
+      animation: pulse-red 1s infinite;
+    }
+    @keyframes pulse-red {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.02); }
+    }
+    .chess-grid-board {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      grid-template-rows: repeat(8, 1fr);
+      width: 320px;
+      height: 320px;
+      border: 3px solid #78350f;
+      border-radius: 6px;
+      overflow: hidden;
+      margin: 0 auto;
+    }
+    .board-sq-w { background-color: #f0d9b5; display: flex; align-items: center; justify-content: center; font-size: 26px; }
+    .board-sq-b { background-color: #b58863; display: flex; align-items: center; justify-content: center; font-size: 26px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+
+  <!-- ==================== TOP NAVIGATION BAR ==================== -->
+  <header id="top-navbar" class="bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-50 shadow-md">
+    <!-- Club Title & Logo -->
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-2xl shadow-inner">
+        ♟️
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 id="club-title" class="font-bold text-lg text-amber-400 tracking-wide cursor-pointer hover:underline" data-i18n-title="editClubNameTooltip" title="Click to rename club">Greencastle Chess Club</h1>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">Meetup Hub</span>
+        </div>
+        <p id="club-subtitle" class="text-xs text-slate-400" data-i18n="clubSubtitle">Casual Chess Meetup Director Console</p>
+      </div>
+    </div>
+
+    <!-- Center: Round Status & Mini Clock -->
+    <div class="flex items-center gap-3 bg-slate-950/80 px-4 py-1.5 rounded-xl border border-slate-800">
+      <div class="flex items-center gap-1.5">
+        <span class="text-xs text-slate-400" data-i18n="currentRoundLabel">Round:</span>
+        <span id="nav-round-badge" class="font-bold text-amber-400 text-sm px-2 py-0.5 bg-amber-500/10 rounded border border-amber-500/30">Round 1</span>
+      </div>
+      <div class="h-4 w-px bg-slate-700"></div>
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-slate-400" data-i18n="timeRemainingLabel">Time:</span>
+        <span id="nav-clock-display" class="font-mono font-bold text-base text-emerald-400">10:00</span>
+      </div>
+    </div>
+
+    <!-- Right: Director Tabs, Language Switcher & Big Screen -->
+    <div class="flex items-center gap-2">
+      <!-- Tabs for Director Mode -->
+      <nav id="director-tabs" class="flex bg-slate-800 p-1 rounded-lg border border-slate-700 text-xs sm:text-sm">
+        <button onclick="switchTab('checkin')" id="tab-btn-checkin" class="tab-btn px-3 py-1.5 rounded-md font-medium transition bg-amber-500 text-slate-950" data-i18n="tabRoster">📋 Roster</button>
+        <button onclick="switchTab('pairing')" id="tab-btn-pairing" class="tab-btn px-3 py-1.5 rounded-md font-medium transition text-slate-300 hover:text-white" data-i18n="tabPairings">⚔️ Pairings</button>
+        <button onclick="switchTab('timer')" id="tab-btn-timer" class="tab-btn px-3 py-1.5 rounded-md font-medium transition text-slate-300 hover:text-white" data-i18n="tabTimer">⏱️ Timer</button>
+        <button onclick="switchTab('standings')" id="tab-btn-standings" class="tab-btn px-3 py-1.5 rounded-md font-medium transition text-slate-300 hover:text-white" data-i18n="tabStandings">🏆 Standings</button>
+        <button onclick="switchTab('icebreaker')" id="tab-btn-icebreaker" class="tab-btn px-3 py-1.5 rounded-md font-medium transition text-slate-300 hover:text-white" data-i18n="tabIcebreakers">🧩 Icebreakers</button>
+      </nav>
+
+      <!-- Switch to other club apps -->
+      <a href="../rules-tool/index.html" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-700 text-xs font-semibold transition" title="Beginner Rules Guide">
+        <span>📖</span>
+        <span class="hidden md:inline" data-i18n="navRulesTool">Rules Guide</span>
+      </a>
+      <a href="../scorekeeping-tool/index.html" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-700 text-xs font-semibold transition" title="Scorekeeping Tutorial">
+        <span>✍️</span>
+        <span class="hidden md:inline" data-i18n="navNotationTool">Scorekeeping</span>
+      </a>
+
+      <!-- Language Switcher Button (EN / 中文) -->
+      <button onclick="toggleLanguage()" id="lang-toggle-btn" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold rounded-lg border border-slate-700 text-xs sm:text-sm transition shadow-sm" title="Switch Language / 切換語言">
+        <span>🌐</span>
+        <span id="lang-btn-label">English</span>
+      </button>
+
+      <!-- Toggle Big Screen View Button -->
+      <button onclick="toggleBigScreen(true)" class="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-3.5 py-1.5 rounded-lg shadow-lg shadow-amber-500/20 text-xs sm:text-sm transition transform active:scale-95">
+        <span>📺</span>
+        <span data-i18n="stageViewBtn">Stage View</span>
+      </button>
+
+      <!-- Fullscreen Toggle -->
+      <button onclick="toggleFullScreen()" title="Fullscreen / 全螢幕" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition">
+        ⛶
+      </button>
+    </div>
+  </header>
+
+  <!-- ==================== DIRECTOR CONSOLE ==================== -->
+  <main id="director-view" class="flex-1 p-4 md:p-6 max-w-7xl mx-auto w-full">
+
+    <!-- TAB 1: Check-in & Roster -->
+    <section id="view-checkin" class="tab-content block space-y-6">
+      <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
+        <div>
+          <h2 class="text-xl font-bold text-slate-100 flex items-center gap-2">
+            <span>📋</span> <span data-i18n="rosterTitle">Attendance & Roster Management</span>
+          </h2>
+          <p class="text-sm text-slate-400 mt-1" data-i18n="rosterDesc">Click player cards to toggle attendance. Only checked-in players will be paired for matches.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-sm bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg">
+            <span data-i18n="checkedInCount">Checked In:</span> <strong id="checked-in-count" class="text-emerald-400 text-base">0</strong> / <span id="total-count">0</span>
+          </span>
+          <button onclick="checkAll(true)" class="text-xs px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-lg font-medium transition" data-i18n="checkAllBtn">Check All</button>
+          <button onclick="checkAll(false)" class="text-xs px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition" data-i18n="uncheckAllBtn">Uncheck All</button>
+          <button onclick="resetRosterToDefault()" class="text-xs px-3 py-2 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 rounded-lg transition" data-i18n="resetDefaultBtn">Reset Default (8)</button>
+        </div>
+      </div>
+
+      <!-- Add Player & Filters Bar -->
+      <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        <form id="add-player-form" onsubmit="handleAddPlayer(event)" class="flex flex-wrap items-center gap-2 flex-1 max-w-xl">
+          <input type="text" id="new-player-name" placeholder="Enter player name / guest (e.g., Alex)" data-i18n-placeholder="addPlayerPlaceholder" required
+            class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500" />
+          <select id="new-player-tier" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
+            <option value="Beginner" data-i18n="tierBeginner">Beginner</option>
+            <option value="Intermediate" data-i18n="tierIntermediate">Intermediate</option>
+            <option value="Advanced" data-i18n="tierAdvanced">Advanced</option>
+          </select>
+          <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm transition" data-i18n="addPlayerBtn">
+            ＋ Add Player
+          </button>
+        </form>
+
+        <div class="flex items-center gap-2">
+          <button onclick="exportData()" class="text-xs px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition" data-i18n="exportDataBtn">
+            📥 Export Data (JSON)
+          </button>
+          <label class="text-xs px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition cursor-pointer" data-i18n="importDataBtn">
+            📤 Import Data
+            <input type="file" id="import-file" onchange="importData(event)" accept=".json" class="hidden" />
+          </label>
+        </div>
+      </div>
+
+      <!-- Roster Grid -->
+      <div id="roster-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+        <!-- Rendered by JS -->
+      </div>
+    </section>
+
+
+    <!-- TAB 2: Pairing & Scoring -->
+    <section id="view-pairing" class="tab-content hidden space-y-6">
+      <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-slate-100 flex items-center gap-2">
+            <span>⚔️</span> <span data-i18n="pairingTitle">Board Pairings & Match Results</span>
+          </h2>
+          <p class="text-sm text-slate-400 mt-1">
+            <span data-i18n="pairingDescPrefix">Auto-generating pairings for</span> <span id="pairing-active-count" class="text-amber-400 font-semibold">0</span> <span data-i18n="pairingDescSuffix">active players. Enter match results after each game.</span>
+          </p>
+        </div>
+        
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
+            <label for="pairing-mode-select" class="text-xs text-slate-300 font-medium" data-i18n="pairingModeLabel">Algorithm:</label>
+            <select id="pairing-mode-select" class="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-amber-300 font-semibold focus:outline-none">
+              <option value="casual" data-i18n="modeCasual">🎲 Casual Random (Avoid repeats)</option>
+              <option value="tier" data-i18n="modeTier">⚖️ Tier Matching (Similar level)</option>
+              <option value="swiss" data-i18n="modeSwiss">🏆 Mini-Swiss (Points based)</option>
+            </select>
+          </div>
+
+          <button onclick="generatePairings()" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold px-4 py-2 rounded-xl shadow-lg shadow-emerald-500/20 text-sm transition transform active:scale-95 flex items-center gap-1.5">
+            <span>⚡</span>
+            <span data-i18n="generatePairingsBtn">Generate Pairings</span>
+          </button>
+
+          <button onclick="nextRound()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 px-3.5 py-2 rounded-xl text-sm font-semibold transition" data-i18n="nextRoundBtn">
+            Next Round ⏩
+          </button>
+        </div>
+      </div>
+
+      <!-- Bye Notice -->
+      <div id="bye-banner" class="hidden bg-amber-500/10 border border-amber-500/30 text-amber-300 p-4 rounded-xl flex items-center gap-3">
+        <span class="text-2xl">⭐</span>
+        <div class="text-sm">
+          <strong data-i18n="byeTitle">Round Bye:</strong>
+          <span id="bye-player-name" class="font-bold underline"></span> <span data-i18n="byeText">receives a 1-point bye this round and will be paired with priority next round!</span>
+        </div>
+      </div>
+
+      <!-- Pairings Board List -->
+      <div id="pairings-list" class="space-y-3">
+        <!-- Rendered by JS -->
+      </div>
+    </section>
+
+
+    <!-- TAB 3: Round Timer -->
+    <section id="view-timer" class="tab-content hidden space-y-6">
+      <div class="bg-slate-900 p-6 md:p-8 rounded-2xl border border-slate-800 text-center max-w-2xl mx-auto shadow-xl">
+        <h2 class="text-lg font-semibold text-slate-300 mb-2" data-i18n="timerSectionTitle">Round Countdown Clock</h2>
+        <div class="text-xs text-slate-400 mb-6" data-i18n="timerSectionDesc">Set the unified round time for all boards. The audio chime will sound automatically when time expires.</div>
+
+        <!-- Big Timer Numbers -->
+        <div class="my-6">
+          <div id="main-timer-display" class="font-mono font-extrabold text-7xl md:text-8xl text-amber-400 tracking-wider drop-shadow-lg">
+            10:00
+          </div>
+          <div id="timer-state-label" class="text-xs uppercase tracking-widest text-slate-400 font-bold mt-2" data-i18n="timerStateReady">READY</div>
+        </div>
+
+        <!-- Preset Buttons -->
+        <div class="flex items-center justify-center gap-2 mb-6">
+          <span class="text-xs text-slate-400 mr-1" data-i18n="timerPresetsLabel">Presets:</span>
+          <button onclick="setTimerMinutes(10)" class="preset-btn px-3.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 transition" data-i18n="preset10m">10 Mins</button>
+          <button onclick="setTimerMinutes(15)" class="preset-btn px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:text-white transition" data-i18n="preset15m">15 Mins</button>
+          <button onclick="setTimerMinutes(20)" class="preset-btn px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:text-white transition" data-i18n="preset20m">20 Mins</button>
+          <div class="flex items-center ml-2 bg-slate-800 rounded-lg px-2 border border-slate-700">
+            <input type="number" id="custom-minutes-input" min="1" max="120" placeholder="Min" data-i18n-placeholder="customMinPlaceholder" class="w-16 bg-transparent py-1 text-xs text-white text-center focus:outline-none" />
+            <button onclick="applyCustomMinutes()" class="text-xs text-amber-400 font-bold px-1 hover:underline" data-i18n="setCustomBtn">Set</button>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <button id="timer-toggle-btn" onclick="toggleTimer()" class="w-36 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold rounded-xl shadow-lg shadow-emerald-500/20 text-base transition transform active:scale-95 flex items-center justify-center gap-2">
+            <span id="timer-toggle-icon">▶</span>
+            <span id="timer-toggle-text" data-i18n="startTimerBtn">Start Timer</span>
+          </button>
+          <button onclick="resetTimer()" class="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl border border-slate-700 text-sm transition" data-i18n="resetTimerBtn">
+            🔄 Reset
+          </button>
+          <button onclick="adjustTime(60)" class="px-3 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl border border-slate-700 text-xs transition">
+            +1 Min
+          </button>
+          <button onclick="adjustTime(-60)" class="px-3 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl border border-slate-700 text-xs transition">
+            -1 Min
+          </button>
+          <button onclick="playChimeSound()" class="px-3 py-3 bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold rounded-xl border border-slate-700 text-xs transition" title="Test Chime Sound" data-i18n="testChimeBtn">
+            🔔 Test Chime
+          </button>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- TAB 4: Standings & Leaderboard -->
+    <section id="view-standings" class="tab-content hidden space-y-6">
+      <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-900 p-5 rounded-2xl border border-slate-800">
+        <div>
+          <h2 class="text-xl font-bold text-slate-100 flex items-center gap-2">
+            <span>🏆</span> <span data-i18n="standingsTitle">Live Standings & Match Record</span>
+          </h2>
+          <p class="text-sm text-slate-400 mt-1" data-i18n="standingsDesc">Win = 1 pt, Draw = 0.5 pt, Loss = 0 pt. Ranked in real-time as results are entered.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="celebrateWinners()" class="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-bold px-4 py-2 rounded-xl shadow-lg shadow-amber-500/20 text-sm transition transform active:scale-95 flex items-center gap-2">
+            <span>🎉</span>
+            <span data-i18n="celebrateBtn">Celebrate & Award</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Standings Table -->
+      <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="bg-slate-800/80 border-b border-slate-700 text-slate-300 text-xs uppercase tracking-wider">
+                <th class="py-3 px-4 w-16 text-center" data-i18n="thRank">Rank</th>
+                <th class="py-3 px-4" data-i18n="thPlayer">Player</th>
+                <th class="py-3 px-4" data-i18n="thTier">Tier</th>
+                <th class="py-3 px-4 text-center" data-i18n="thPlayed">Played</th>
+                <th class="py-3 px-4 text-center" data-i18n="thWDL">W / D / L</th>
+                <th class="py-3 px-4 text-center" data-i18n="thPoints">Points</th>
+                <th class="py-3 px-4 text-center" data-i18n="thWinRate">Win Rate</th>
+              </tr>
+            </thead>
+            <tbody id="standings-table-body" class="divide-y divide-slate-800 text-slate-200">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- TAB 5: Icebreakers & Puzzles -->
+    <section id="view-icebreaker" class="tab-content hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Pawn Wars -->
+        <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold" data-i18n="pawnWarsBadge">Warm-up / Beginners</span>
+              <span class="text-xs text-slate-400" data-i18n="pawnWarsDuration">Duration: ~3-5 mins</span>
+            </div>
+            <h3 class="text-xl font-bold text-amber-400 mb-2 flex items-center gap-2">
+              <span>♟️</span> <span>Pawn Wars</span>
+            </h3>
+            <p class="text-sm text-slate-300 mb-4 leading-relaxed" data-i18n="pawnWarsDesc">
+              Great for beginners and younger kids! Set up only the 8 pawns on ranks 2 and 7; leave all other pieces off the board.
+            </p>
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs text-slate-300 mb-4">
+              <div class="font-bold text-amber-300 text-sm" data-i18n="pawnWarsWinCondTitle">🎯 How to Win (First to achieve any):</div>
+              <ul class="list-disc list-inside space-y-1 text-slate-300" id="pawn-wars-rules">
+                <li data-i18n="pawnWarsRule1">First pawn to reach the opposite end of the board (rank 8/1).</li>
+                <li data-i18n="pawnWarsRule2">Capture all of the opponent's pawns.</li>
+                <li data-i18n="pawnWarsRule3">Leave the opponent with no legal moves remaining.</li>
+              </ul>
+              <div class="text-slate-400 pt-1 border-t border-slate-800" data-i18n="pawnWarsKeySkills">
+                💡 <strong>Key Skills:</strong> First pawn move (1 or 2 squares), diagonal captures, pawn breaks & defense.
+              </div>
+            </div>
+          </div>
+          <button onclick="setTimerMinutes(5); switchTab('timer');" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold rounded-xl border border-amber-500/30 text-xs transition flex items-center justify-center gap-2">
+            <span>⏱️</span> <span data-i18n="pawnWarsSetTimerBtn">Set 5-min timer & go to Timer</span>
+          </button>
+        </div>
+
+        <!-- Puzzle of the Day -->
+        <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-xs px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold" data-i18n="puzzleBadge">Tactical Puzzle</span>
+            <div class="flex items-center gap-1.5">
+              <button onclick="prevPuzzle()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-xs rounded border border-slate-700" data-i18n="prevPuzzleBtn">◀ Prev</button>
+              <span id="puzzle-index-label" class="text-xs text-slate-400 font-mono">1 / 3</span>
+              <button onclick="nextPuzzle()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-xs rounded border border-slate-700" data-i18n="nextPuzzleBtn">Next ▶</button>
+            </div>
+          </div>
+
+          <h3 id="puzzle-title" class="text-lg font-bold text-slate-100 mb-1">Back-Rank Mate</h3>
+          <p id="puzzle-desc" class="text-xs text-slate-400 mb-3">White to move. Find the checkmate!</p>
+
+          <!-- Chessboard Display -->
+          <div id="chessboard-container" class="mb-4">
+            <!-- Rendered by JS (8x8 grid) -->
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button onclick="togglePuzzleHint()" id="hint-btn" class="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold rounded-lg border border-slate-700 transition" data-i18n="showHintBtn">
+              💡 Show Hint
+            </button>
+            <button onclick="togglePuzzleSolution()" id="solution-btn" class="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition" data-i18n="revealSolutionBtn">
+              🔍 Reveal Solution
+            </button>
+          </div>
+
+          <div id="puzzle-hint-box" class="hidden mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-200">
+            <!-- Hint content -->
+          </div>
+          <div id="puzzle-solution-box" class="hidden mt-3 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-xs text-emerald-200 font-semibold">
+            <!-- Solution content -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+
+  <!-- ==================== BIG SCREEN / STAGE VIEW ==================== -->
+  <div id="big-screen-view" class="hidden fixed inset-0 bg-slate-950 z-50 flex flex-col p-6 overflow-y-auto custom-scroll">
+    <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
+      <div class="flex items-center gap-4">
+        <div class="w-14 h-14 rounded-2xl bg-amber-500/20 border-2 border-amber-500/50 flex items-center justify-center text-4xl shadow-lg">
+          ♟️
+        </div>
+        <div>
+          <h1 class="text-3xl font-black text-amber-400 tracking-wide">Greencastle Chess Club</h1>
+          <p class="text-sm text-slate-400 font-medium" data-i18n="stageSubtitle">Community Casual Chess Meetup • Library Community Room</p>
+        </div>
+      </div>
+
+      <!-- Center Big Screen Round Indicator -->
+      <div class="text-center">
+        <div id="stage-round-label" class="text-2xl font-extrabold text-slate-100 uppercase tracking-widest px-4 py-1 bg-slate-900 border border-slate-800 rounded-xl">
+          Round 1
+        </div>
+      </div>
+
+      <!-- Exit Big Screen Button -->
+      <button onclick="toggleBigScreen(false)" class="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white px-4 py-2.5 rounded-xl border border-slate-700 text-sm font-bold transition">
+        <span>✖</span>
+        <span data-i18n="exitStageBtn">Exit Stage (Esc)</span>
+      </button>
+    </div>
+
+    <!-- Giant Countdown Clock Section -->
+    <div class="bg-gradient-to-b from-slate-900 to-slate-950 p-6 rounded-3xl border border-slate-800 shadow-2xl text-center mb-8 relative overflow-hidden">
+      <div class="text-xs uppercase tracking-widest text-slate-400 font-bold mb-1" data-i18n="stageTimerLabel">Round Time Remaining</div>
+      <div id="stage-timer-display" class="font-mono font-black text-8xl md:text-9xl text-amber-400 tracking-wider drop-shadow-2xl my-2">
+        10:00
+      </div>
+      <div class="flex items-center justify-center gap-4 text-xs font-bold text-slate-400">
+        <span id="stage-timer-status" class="px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-emerald-400" data-i18n="stageStatusInProgress">● In Progress</span>
+        <span data-i18n="stageEtiquetteText">• Shake hands before & after play 🤝 • Report results to Director</span>
+      </div>
+    </div>
+
+    <!-- Giant Pairings Board Grid -->
+    <div class="flex-1">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-bold text-slate-200 flex items-center gap-2">
+          <span>⚔️</span> <span data-i18n="stageBoardPairingsTitle">Board Pairings</span>
+        </h2>
+        <span class="text-sm text-slate-400"><span id="stage-board-count" class="text-amber-400 font-bold">0</span> <span data-i18n="stageBoardsCountSuffix">Boards in play</span></span>
+      </div>
+
+      <div id="stage-pairings-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+
+    <!-- Footer Ticker -->
+    <footer class="mt-8 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+      <div data-i18n="footerTagline">Greencastle PA Community Chess • Friendly & Drop-in Welcome</div>
+      <div data-i18n="footerEscReminder">Press Esc to exit stage view</div>
+    </footer>
+  </div>
+
+
+  <!-- ==================== SCRIPT & I18N DICTIONARY ==================== -->
+  <script>
+    // --- Internationalization (i18n) Dictionary ---
+    const TRANSLATIONS = {
+      en: {
+        langName: "English",
+        editClubNameTooltip: "Click to rename club",
+        clubSubtitle: "Casual Chess Meetup Director Console",
+        currentRoundLabel: "Round:",
+        timeRemainingLabel: "Time:",
+        tabRoster: "📋 Roster",
+        tabPairings: "⚔️ Pairings",
+        tabTimer: "⏱️ Timer",
+        tabStandings: "🏆 Standings",
+        tabIcebreakers: "🧩 Icebreakers",
+        navRulesTool: "Rules Guide",
+        navNotationTool: "Scorekeeping",
+        stageViewBtn: "Stage View",
+        rosterTitle: "Attendance & Roster Management",
+        rosterDesc: "Click player cards to toggle attendance. Only checked-in players will be paired for matches.",
+        checkedInCount: "Checked In:",
+        checkAllBtn: "Check All",
+        uncheckAllBtn: "Uncheck All",
+        resetDefaultBtn: "Reset Default (8)",
+        addPlayerPlaceholder: "Enter player name / guest (e.g., Alex)",
+        tierBeginner: "Beginner",
+        tierIntermediate: "Intermediate",
+        tierAdvanced: "Advanced",
+        addPlayerBtn: "＋ Add Player",
+        exportDataBtn: "📥 Export Data (JSON)",
+        importDataBtn: "📤 Import Data",
+        pairingTitle: "Board Pairings & Match Results",
+        pairingDescPrefix: "Auto-generating pairings for",
+        pairingDescSuffix: "active players. Enter match results after each game.",
+        pairingModeLabel: "Algorithm:",
+        modeCasual: "🎲 Casual Random (Avoid repeats)",
+        modeTier: "⚖️ Tier Matching (Similar level)",
+        modeSwiss: "🏆 Mini-Swiss (Points based)",
+        generatePairingsBtn: "Generate Pairings",
+        nextRoundBtn: "Next Round ⏩",
+        byeTitle: "Round Bye:",
+        byeText: "receives a 1-point bye this round and will be paired with priority next round!",
+        noPairingsYet: "No pairings generated yet. Check in players and click 'Generate Pairings' above.",
+        boardLabel: "Table",
+        swapColorsTooltip: "Swap White / Black",
+        whiteBadge: "White ♔",
+        blackBadge: "Black ♚",
+        whiteWonBtn: "White (1-0)",
+        drawBtn: "Draw (½-½)",
+        blackWonBtn: "Black (0-1)",
+        clearResultTitle: "Clear result",
+        gamesPlayed: "Games",
+        totalPoints: "Points",
+        statusPresent: "● Present",
+        statusAbsent: "○ Absent",
+        deletePlayerTooltip: "Delete player",
+        timerSectionTitle: "Round Countdown Clock",
+        timerSectionDesc: "Set the unified round time for all boards. The audio chime will sound automatically when time expires.",
+        timerStateReady: "READY",
+        timerStateRunning: "RUNNING",
+        timerStatePaused: "PAUSED",
+        timerStateTimeUp: "TIME IS UP!",
+        timerPresetsLabel: "Presets:",
+        preset10m: "10 Mins",
+        preset15m: "15 Mins",
+        preset20m: "20 Mins",
+        customMinPlaceholder: "Min",
+        setCustomBtn: "Set",
+        startTimerBtn: "Start Timer",
+        pauseTimerBtn: "Pause Timer",
+        resumeTimerBtn: "Resume Timer",
+        resetTimerBtn: "🔄 Reset",
+        testChimeBtn: "🔔 Test Chime",
+        standingsTitle: "Live Standings & Match Record",
+        standingsDesc: "Win = 1 pt, Draw = 0.5 pt, Loss = 0 pt. Ranked in real-time as results are entered.",
+        celebrateBtn: "Celebrate & Award",
+        thRank: "Rank",
+        thPlayer: "Player",
+        thTier: "Tier",
+        thPlayed: "Played",
+        thWDL: "W / D / L",
+        thPoints: "Points",
+        thWinRate: "Win Rate",
+        pawnWarsBadge: "Warm-up / Beginners",
+        pawnWarsDuration: "Duration: ~3-5 mins",
+        pawnWarsDesc: "Great for beginners and younger kids! Set up only the 8 pawns on ranks 2 and 7; leave all other pieces off the board.",
+        pawnWarsWinCondTitle: "🎯 How to Win (First to achieve any):",
+        pawnWarsRule1: "First pawn to reach the opposite end of the board (rank 8/1).",
+        pawnWarsRule2: "Capture all of the opponent's pawns.",
+        pawnWarsRule3: "Leave the opponent with no legal moves remaining.",
+        pawnWarsKeySkills: "💡 Key Skills: First pawn move (1 or 2 squares), diagonal captures, pawn breaks & defense.",
+        pawnWarsSetTimerBtn: "Set 5-min timer & go to Timer",
+        puzzleBadge: "Tactical Puzzle",
+        prevPuzzleBtn: "◀ Prev",
+        nextPuzzleBtn: "Next ▶",
+        showHintBtn: "💡 Show Hint",
+        revealSolutionBtn: "🔍 Reveal Solution",
+        stageSubtitle: "Community Casual Chess Meetup • Library Community Room",
+        exitStageBtn: "Exit Stage (Esc)",
+        stageTimerLabel: "Round Time Remaining",
+        stageStatusInProgress: "● In Progress",
+        stageStatusPaused: "● Paused",
+        stageStatusTimeUp: "● Time's Up",
+        stageStatusReady: "● Ready",
+        stageEtiquetteText: "• Shake hands before & after play 🤝 • Report results to Director",
+        stageBoardPairingsTitle: "Board Pairings",
+        stageBoardsCountSuffix: "Boards in play",
+        stagePreparing: "Preparing Pairings...",
+        stagePreparingDesc: "Director is setting up boards, please wait a moment.",
+        stageWhiteSide: "White",
+        stageBlackSide: "Black",
+        stagePleaseTakeSeat: "Please proceed to Table",
+        footerTagline: "Greencastle PA Community Chess • Friendly & Drop-in Welcome",
+        footerEscReminder: "Press Esc to exit stage view",
+        // Dialogs & Messages
+        atLeastTwoPlayersAlert: "At least 2 checked-in players are required to generate pairings!",
+        roundPairingGeneratedMsg: "Round {round} pairings generated! Total {boards} boards.",
+        unfinishedGamesWarning: "There are still {unfinished} unfinished games in Round {round}. Proceed to next round anyway?",
+        nextRoundSuccessMsg: "Entered Round {round}! Click 'Generate Pairings' to setup boards.",
+        confirmResetDefault: "Reset roster to the default 8 players? Current scores will be cleared.",
+        confirmDeletePlayer: "Are you sure you want to remove this player?",
+        celebrateAlert: "🎉 Wonderful games today at Greencastle Chess Club! Great sportsmanship and fantastic thinking across every board!",
+        importSuccessAlert: "Roster and meetup data imported successfully!",
+        importInvalidAlert: "Invalid JSON backup file format!",
+        importFailedAlert: "Failed to parse JSON file!"
+      },
+      zh: {
+        langName: "繁體中文",
+        editClubNameTooltip: "點擊修改社團名稱",
+        clubSubtitle: "社區西洋棋聚會現場主控系統",
+        currentRoundLabel: "目前輪次:",
+        timeRemainingLabel: "倒數:",
+        tabRoster: "📋 簽到名冊",
+        tabPairings: "⚔️ 桌次配對",
+        tabTimer: "⏱️ 計時器",
+        tabStandings: "🏆 積分榜",
+        tabIcebreakers: "🧩 破冰殘局",
+        navRulesTool: "規則指南",
+        navNotationTool: "記譜計分",
+        stageViewBtn: "大螢幕公播",
+        rosterTitle: "今日簽到與名單管理",
+        rosterDesc: "點擊選手卡片打勾即可完成簽到。只有今日已簽到的成員才會參與自動桌次配對。",
+        checkedInCount: "已簽到:",
+        checkAllBtn: "全部簽到",
+        uncheckAllBtn: "一鍵取消",
+        resetDefaultBtn: "重設預設 (8人)",
+        addPlayerPlaceholder: "輸入棋友姓名 / 臨時訪客 (例如: Alex)",
+        tierBeginner: "新手 (Beginner)",
+        tierIntermediate: "中級 (Intermediate)",
+        tierAdvanced: "進階 (Advanced)",
+        addPlayerBtn: "＋ 新增成員",
+        exportDataBtn: "📥 匯出資料 (JSON)",
+        importDataBtn: "📤 匯入資料",
+        pairingTitle: "桌次配對與成績登記",
+        pairingDescPrefix: "針對當前已簽到的",
+        pairingDescSuffix: "位棋友自動生成桌次。下完後點擊按鈕直接登記結果。",
+        pairingModeLabel: "配對演算法:",
+        modeCasual: "🎲 休閒隨機 (防重複交手)",
+        modeTier: "⚖️ 實力分級 (同程度對弈)",
+        modeSwiss: "🏆 積分同分對決 (Mini-Swiss)",
+        generatePairingsBtn: "一鍵生成本輪配對",
+        nextRoundBtn: "進入下一輪 ⏩",
+        byeTitle: "本輪輪空 (Bye)：",
+        byeText: "本輪自動輪空並獲得 1 分，下一輪將優先配對！",
+        noPairingsYet: "尚未生成本輪配對，請確認簽到後點擊上方「一鍵生成本輪配對」。",
+        boardLabel: "第",
+        swapColorsTooltip: "互換黑白棋",
+        whiteBadge: "白 ♔",
+        blackBadge: "黑 ♚",
+        whiteWonBtn: "白勝 (1-0)",
+        drawBtn: "和棋 (½-½)",
+        blackWonBtn: "黑勝 (0-1)",
+        clearResultTitle: "清除結果",
+        gamesPlayed: "出賽",
+        totalPoints: "總分",
+        statusPresent: "● 已出席",
+        statusAbsent: "○ 未報到",
+        deletePlayerTooltip: "刪除棋友",
+        timerSectionTitle: "全場輪次倒數計時鐘 (Round Clock)",
+        timerSectionDesc: "可設定全場統一時間，時間結束時自動響起提示音。",
+        timerStateReady: "準備就緒 (READY)",
+        timerStateRunning: "計時進行中 (RUNNING)",
+        timerStatePaused: "已暫停 (PAUSED)",
+        timerStateTimeUp: "時間到！ (TIME IS UP)",
+        timerPresetsLabel: "快捷預設:",
+        preset10m: "10 分鐘",
+        preset15m: "15 分鐘",
+        preset20m: "20 分鐘",
+        customMinPlaceholder: "自訂分",
+        setCustomBtn: "設定",
+        startTimerBtn: "開始計時",
+        pauseTimerBtn: "暫停計時",
+        resumeTimerBtn: "繼續計時",
+        resetTimerBtn: "🔄 重設時間",
+        testChimeBtn: "🔔 測試鈴聲",
+        standingsTitle: "即時戰績與累積積分榜",
+        standingsDesc: "勝局記 1 分、和局記 0.5 分、負局記 0 分。下完各輪即時結算。",
+        celebrateBtn: "結算頒獎 / 彩花慶祝",
+        thRank: "排名",
+        thPlayer: "棋友姓名",
+        thTier: "程度級別",
+        thPlayed: "出賽場次",
+        thWDL: "勝 / 和 / 負",
+        thPoints: "總積分",
+        thWinRate: "勝率",
+        pawnWarsBadge: "新手熱身 / 兒童破冰",
+        pawnWarsDuration: "時長約 3-5 分鐘",
+        pawnWarsDesc: "適合初學小朋友與剛認識棋盤的朋友，只使用雙方的 8 隻兵 (Pawns) 擺在第 2 橫行與第 7 橫行，其他棋子不放。",
+        pawnWarsWinCondTitle: "🎯 獲勝條件 (三選一)：",
+        pawnWarsRule1: "率先將任何一隻兵走到對面底線（升變）即獲勝！",
+        pawnWarsRule2: "吃光對手所有的兵。",
+        pawnWarsRule3: "讓對手所有兵全部卡死、無步可走。",
+        pawnWarsKeySkills: "💡 練習重點：兵第一步走一格或兩格、斜吃一格、兵與兵之間的阻擋與突破。",
+        pawnWarsSetTimerBtn: "設定 5 分鐘計時並前往計時器",
+        puzzleBadge: "戰術殘局展示",
+        prevPuzzleBtn: "◀ 上一題",
+        nextPuzzleBtn: "下一題 ▶",
+        showHintBtn: "💡 顯示提示",
+        revealSolutionBtn: "🔍 查看答案",
+        stageSubtitle: "Community Casual Chess Meetup • Library Community Room",
+        exitStageBtn: "返回主控台 (Esc)",
+        stageTimerLabel: "輪次剩餘時間 (Round Time Remaining)",
+        stageStatusInProgress: "● 計時進行中",
+        stageStatusPaused: "● 已暫停",
+        stageStatusTimeUp: "● 本輪結束 (Time Up)",
+        stageStatusReady: "● 準備就緒",
+        stageEtiquetteText: "• 下完請至桌旁握手致意 🤝 • 隨時向社長回報勝負",
+        stageBoardPairingsTitle: "即時對局桌次表 (Board Pairings)",
+        stageBoardsCountSuffix: "桌對局",
+        stagePreparing: "準備排桌中...",
+        stagePreparingDesc: "主控台正生成對局名單，請稍候。",
+        stageWhiteSide: "白方",
+        stageBlackSide: "黑方",
+        stagePleaseTakeSeat: "請至第",
+        footerTagline: "Greencastle PA Community Chess • Friendly & Drop-in Welcome",
+        footerEscReminder: "按 Esc 退出大螢幕視圖",
+        atLeastTwoPlayersAlert: "至少需要 2 位簽到的棋友才能進行配對！",
+        roundPairingGeneratedMsg: "第 {round} 輪配對已生成！共 {boards} 桌對局。",
+        unfinishedGamesWarning: "第 {round} 輪還有 {unfinished} 桌對局未登記成績，確定要結束此輪並進入下一輪嗎？",
+        nextRoundSuccessMsg: "已進入第 {round} 輪！請點擊「一鍵生成本輪配對」排桌。",
+        confirmResetDefault: "確定要重設為預設的 8 位成員 (Player 1 ~ 8) 嗎？現有資料將被清除。",
+        confirmDeletePlayer: "確定要移除此棋友嗎？",
+        celebrateAlert: "🎉 恭喜大家今天在 Greencastle Chess Club 的精彩對局！每一局都是寶貴的進步與交流！",
+        importSuccessAlert: "名冊與活動資料匯入成功！",
+        importInvalidAlert: "檔案格式不正確！",
+        importFailedAlert: "解析 JSON 檔案失敗！"
+      }
+    };
+
+    // --- Puzzles Data in Multilingual ---
+    const PUZZLE_DATA = {
+      en: [
+        {
+          title: "1. Back-Rank Mate",
+          desc: "White to move. Black's king is trapped behind its own pawns on the back rank. Find the checkmate!",
+          board: [
+            ["", "", "", "", "", "♜", "♚", ""],
+            ["♟", "♟", "♟", "", "", "♟", "♟", "♟"],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["♙", "♙", "♙", "", "", "♙", "♙", "♙"],
+            ["", "", "♖", "", "", "", "♔", ""]
+          ],
+          hint: "Notice that only one black rook defends the 8th rank. White has a rook that can deliver mate!",
+          solution: "1. Rc8+! Rxc8 2. Rxc8# (Checkmate on the back rank!)"
+        },
+        {
+          title: "2. Knight Fork",
+          desc: "White to move. Use the knight's unique L-shaped jump to attack the king and queen simultaneously!",
+          board: [
+            ["", "", "", "♛", "", "", "♚", ""],
+            ["♟", "♟", "♟", "", "", "♟", "♟", "♟"],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "♘", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["♙", "♙", "♙", "", "", "♙", "♙", "♙"],
+            ["", "", "", "", "", "", "♔", ""]
+          ],
+          hint: "Black king is on g8, queen is on d8. Where can the knight on e5 jump to threaten both?",
+          solution: "1. Nf7+! Check! The king must move, then White takes the queen with 2. Nxd8!"
+        },
+        {
+          title: "3. The Absolute Pin",
+          desc: "White to move. Use the bishop's diagonal reach to pin an important defending piece!",
+          board: [
+            ["", "", "", "", "", "", "♚", ""],
+            ["", "", "", "♜", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "♗", "", "", "", "", "", ""],
+            ["♙", "♙", "♙", "", "", "♙", "♙", "♙"],
+            ["", "", "", "", "", "", "♔", ""]
+          ],
+          hint: "The bishop on b3 points straight along the diagonal at Black's king on g8 through the rook on d5!",
+          solution: "The black rook is absolutely pinned to the king and cannot move away. White captures it next turn."
+        }
+      ],
+      zh: [
+        {
+          title: "1. 底線將殺 (Back-Rank Mate)",
+          desc: "白先。黑棋國王被自家兵卡在底線，尋找一步將殺！",
+          board: [
+            ["", "", "", "", "", "♜", "♚", ""],
+            ["♟", "♟", "♟", "", "", "♟", "♟", "♟"],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["♙", "♙", "♙", "", "", "♙", "♙", "♙"],
+            ["", "", "♖", "", "", "", "♔", ""]
+          ],
+          hint: "注意黑棋底線第 8 橫行只有一隻黑車防守，白車可直衝到底線！",
+          solution: "1. ♖c8+ ♜xc8 2. ♖xc8# (底線將死！)"
+        },
+        {
+          title: "2. 騎士捉雙 (Knight Fork)",
+          desc: "白先。利用騎士的特殊 L 型走法，同時威脅黑王與黑后！",
+          board: [
+            ["", "", "", "♛", "", "", "♚", ""],
+            ["♟", "♟", "♟", "", "", "♟", "♟", "♟"],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "♘", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["♙", "♙", "♙", "", "", "♙", "♙", "♙"],
+            ["", "", "", "", "", "", "♔", ""]
+          ],
+          hint: "黑王在 g8，黑后在 d8。白騎士在 e5，能跳到哪裡同時攻擊兩者？",
+          solution: "1. ♘f7+！國王必須閃避，下一步吃掉黑后 2. ♘xd8！"
+        },
+        {
+          title: "3. 牽制戰術 (Pin)",
+          desc: "白先。利用主教的斜向長程威力，牽制對手重要的防守棋子！",
+          board: [
+            ["", "", "", "", "", "", "♚", ""],
+            ["", "", "", "♜", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "♗", "", "", "", "", "", ""],
+            ["♙", "♙", "♙", "", "", "♙", "♙", "♙"],
+            ["", "", "", "", "", "", "♔", ""]
+          ],
+          hint: "白主教從 b3 沿斜線直指黑王 g8，中間有黑車阻擋，黑車動彈不得！",
+          solution: "黑車已被完全牽制 (Absolute Pin)，無法移動否則暴露黑王，白棋可在下一回合輕取黑車。"
+        }
+      ]
+    };
+
+    // --- Translation Helper ---
+    function t(key, params = {}) {
+      const lang = state.lang || 'en';
+      let str = (TRANSLATIONS[lang] && TRANSLATIONS[lang][key]) || TRANSLATIONS['en'][key] || key;
+      for (const [k, v] of Object.entries(params)) {
+        str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
+      }
+      return str;
+    }
+
+    // --- State & Defaults ---
+    const STORAGE_KEY = 'chess_club_meetup_state_v2';
+
+    const DEFAULT_PLAYERS = [
+      { id: 'p1', name: 'Player 1', tier: 'Intermediate', checkedIn: true, wins: 0, draws: 0, losses: 0, points: 0 },
+      { id: 'p2', name: 'Player 2', tier: 'Intermediate', checkedIn: true, wins: 0, draws: 0, losses: 0, points: 0 },
+      { id: 'p3', name: 'Player 3', tier: 'Beginner', checkedIn: true, wins: 0, draws: 0, losses: 0, points: 0 },
+      { id: 'p4', name: 'Player 4', tier: 'Beginner', checkedIn: true, wins: 0, draws: 0, losses: 0, points: 0 },
+      { id: 'p5', name: 'Player 5', tier: 'Advanced', checkedIn: true, wins: 0, draws: 0, losses: 0, points: 0 },
+      { id: 'p6', name: 'Player 6', tier: 'Intermediate', checkedIn: true, wins: 0, draws: 0, losses: 0, points: 0 },
+      { id: 'p7', name: 'Player 7', tier: 'Beginner', checkedIn: true, wins: 0, draws: 0, losses: 0, points: 0 },
+      { id: 'p8', name: 'Player 8', tier: 'Beginner', checkedIn: true, wins: 0, draws: 0, losses: 0, points: 0 },
+    ];
+
+    let state = {
+      lang: 'en', // Default to English as requested
+      clubName: 'Greencastle Chess Club',
+      currentRound: 1,
+      players: JSON.parse(JSON.stringify(DEFAULT_PLAYERS)),
+      pairings: [],
+      byePlayerId: null,
+      historyMatches: [],
+      timer: {
+        totalSeconds: 600, // 10 mins default
+        remainingSeconds: 600,
+        isRunning: false
+      }
+    };
+
+    let timerInterval = null;
+    let currentPuzzleIndex = 0;
+
+    // --- State Persistence ---
+    function loadState() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          state = { ...state, ...parsed };
+        } catch (e) {
+          console.error('Failed to parse saved state', e);
+        }
+      }
+      if (!state.lang) state.lang = 'en';
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    // --- Audio Synthesis via Web Audio API ---
+    function playChimeSound() {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        // Dual harmonious bell frequencies
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+        osc1.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.25); // G5
+
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(659.25, ctx.currentTime); // E5
+        osc2.frequency.exponentialRampToValueAtTime(1046.50, ctx.currentTime + 0.25); // C6
+
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.8);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc1.start();
+        osc2.start();
+        osc1.stop(ctx.currentTime + 1.8);
+        osc2.stop(ctx.currentTime + 1.8);
+      } catch (err) {
+        console.warn('Audio chime unsupported or blocked', err);
+      }
+    }
+
+    // --- Language Toggle Logic ---
+    function toggleLanguage() {
+      state.lang = (state.lang === 'en') ? 'zh' : 'en';
+      saveState();
+      applyLanguage();
+    }
+
+    function applyLanguage() {
+      document.documentElement.lang = (state.lang === 'en') ? 'en' : 'zh-TW';
+      
+      // Update toggle button text
+      const langLabel = document.getElementById('lang-btn-label');
+      if (langLabel) {
+        langLabel.textContent = (state.lang === 'en') ? 'English' : '繁體中文';
+      }
+
+      // Update static data-i18n elements
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (key) {
+          el.textContent = t(key);
+        }
+      });
+
+      // Update placeholders
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (key) {
+          el.placeholder = t(key);
+        }
+      });
+
+      // Update titles
+      document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const key = el.getAttribute('data-i18n-title');
+        if (key) {
+          el.title = t(key);
+        }
+      });
+
+      // Re-render dynamic components with translated labels
+      renderAll();
+      renderCurrentPuzzle();
+    }
+
+    // --- Tab Switching ---
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-amber-500', 'text-slate-950');
+        btn.classList.add('text-slate-300');
+      });
+
+      const target = document.getElementById(`view-${tabId}`);
+      const btn = document.getElementById(`tab-btn-${tabId}`);
+      if (target) target.classList.remove('hidden');
+      if (btn) {
+        btn.classList.add('bg-amber-500', 'text-slate-950');
+        btn.classList.remove('text-slate-300');
+      }
+    }
+
+    // --- Big Screen Toggle ---
+    function toggleBigScreen(show) {
+      const stage = document.getElementById('big-screen-view');
+      if (show) {
+        stage.classList.remove('hidden');
+        renderStageView();
+      } else {
+        stage.classList.add('hidden');
+      }
+    }
+
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.log(`Error attempting to enable fullscreen: ${err.message}`);
+        });
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        toggleBigScreen(false);
+      }
+    });
+
+    // --- Timer Management ---
+    function formatTime(seconds) {
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function updateTimerDisplays() {
+      const timeStr = formatTime(state.timer.remainingSeconds);
+      document.getElementById('nav-clock-display').textContent = timeStr;
+      document.getElementById('main-timer-display').textContent = timeStr;
+      document.getElementById('stage-timer-display').textContent = timeStr;
+
+      const mainTimer = document.getElementById('main-timer-display');
+      const stageTimer = document.getElementById('stage-timer-display');
+      if (state.timer.remainingSeconds <= 60 && state.timer.remainingSeconds > 0) {
+        mainTimer.classList.add('timer-critical');
+        stageTimer.classList.add('timer-critical');
+      } else {
+        mainTimer.classList.remove('timer-critical');
+        stageTimer.classList.remove('timer-critical');
+      }
+    }
+
+    function toggleTimer() {
+      if (state.timer.isRunning) {
+        pauseTimer();
+      } else {
+        startTimer();
+      }
+    }
+
+    function startTimer() {
+      if (state.timer.remainingSeconds <= 0) return;
+      state.timer.isRunning = true;
+      document.getElementById('timer-toggle-btn').classList.remove('bg-emerald-500', 'hover:bg-emerald-400');
+      document.getElementById('timer-toggle-btn').classList.add('bg-amber-500', 'hover:bg-amber-400');
+      document.getElementById('timer-toggle-text').textContent = t('pauseTimerBtn');
+      document.getElementById('timer-toggle-icon').textContent = '⏸';
+      document.getElementById('timer-state-label').textContent = t('timerStateRunning');
+      document.getElementById('stage-timer-status').textContent = t('stageStatusInProgress');
+      document.getElementById('stage-timer-status').className = 'px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40';
+
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        if (state.timer.remainingSeconds > 0) {
+          state.timer.remainingSeconds--;
+          updateTimerDisplays();
+          saveState();
+        } else {
+          pauseTimer();
+          playChimeSound();
+          document.getElementById('timer-state-label').textContent = t('timerStateTimeUp');
+          document.getElementById('stage-timer-status').textContent = t('stageStatusTimeUp');
+          document.getElementById('stage-timer-status').className = 'px-3 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40';
+        }
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      state.timer.isRunning = false;
+      clearInterval(timerInterval);
+      document.getElementById('timer-toggle-btn').classList.add('bg-emerald-500', 'hover:bg-emerald-400');
+      document.getElementById('timer-toggle-btn').classList.remove('bg-amber-500', 'hover:bg-amber-400');
+      document.getElementById('timer-toggle-text').textContent = (state.timer.remainingSeconds < state.timer.totalSeconds) ? t('resumeTimerBtn') : t('startTimerBtn');
+      document.getElementById('timer-toggle-icon').textContent = '▶';
+      document.getElementById('timer-state-label').textContent = t('timerStatePaused');
+      document.getElementById('stage-timer-status').textContent = t('stageStatusPaused');
+      document.getElementById('stage-timer-status').className = 'px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40';
+      saveState();
+    }
+
+    function resetTimer() {
+      pauseTimer();
+      state.timer.remainingSeconds = state.timer.totalSeconds;
+      document.getElementById('timer-toggle-text').textContent = t('startTimerBtn');
+      document.getElementById('timer-state-label').textContent = t('timerStateReady');
+      document.getElementById('stage-timer-status').textContent = t('stageStatusReady');
+      document.getElementById('stage-timer-status').className = 'px-3 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700';
+      updateTimerDisplays();
+      saveState();
+    }
+
+    function setTimerMinutes(mins) {
+      pauseTimer();
+      state.timer.totalSeconds = mins * 60;
+      state.timer.remainingSeconds = mins * 60;
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.classList.remove('bg-amber-500', 'text-slate-950');
+        btn.classList.add('bg-slate-800', 'text-slate-300');
+      });
+      event?.target?.classList?.remove('bg-slate-800', 'text-slate-300');
+      event?.target?.classList?.add('bg-amber-500', 'text-slate-950');
+      resetTimer();
+    }
+
+    function applyCustomMinutes() {
+      const input = document.getElementById('custom-minutes-input');
+      const val = parseInt(input.value);
+      if (val && val > 0 && val <= 180) {
+        setTimerMinutes(val);
+        input.value = '';
+      }
+    }
+
+    function adjustTime(deltaSeconds) {
+      state.timer.remainingSeconds = Math.max(0, state.timer.remainingSeconds + deltaSeconds);
+      updateTimerDisplays();
+      saveState();
+    }
+
+    // --- Roster Management ---
+    function renderRoster() {
+      const grid = document.getElementById('roster-grid');
+      grid.innerHTML = '';
+
+      let checkedCount = 0;
+
+      state.players.forEach(p => {
+        if (p.checkedIn) checkedCount++;
+
+        const card = document.createElement('div');
+        const isChecked = p.checkedIn;
+        card.className = `p-4 rounded-xl border transition cursor-pointer flex flex-col justify-between ${
+          isChecked 
+            ? 'bg-slate-900 border-emerald-500/50 shadow-md shadow-emerald-950/20' 
+            : 'bg-slate-900/40 border-slate-800 opacity-60'
+        }`;
+
+        let tierColor = 'bg-slate-800 text-slate-300 border-slate-700';
+        if (p.tier === 'Beginner') tierColor = 'bg-blue-500/10 text-blue-300 border-blue-500/30';
+        if (p.tier === 'Intermediate') tierColor = 'bg-amber-500/10 text-amber-300 border-amber-500/30';
+        if (p.tier === 'Advanced') tierColor = 'bg-purple-500/10 text-purple-300 border-purple-500/30';
+
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2" onclick="toggleCheckIn('${p.id}')">
+            <div>
+              <div class="font-bold text-base text-slate-100 flex items-center gap-2">
+                <span>${p.name}</span>
+                <span class="text-xs px-2 py-0.5 rounded-full border ${tierColor}">${p.tier}</span>
+              </div>
+              <div class="text-xs text-slate-400 mt-1">
+                ${t('gamesPlayed')}: ${p.wins + p.draws + p.losses} | ${t('totalPoints')}: <strong class="text-amber-400">${p.points}</strong>
+              </div>
+            </div>
+            <div class="w-6 h-6 rounded-lg flex items-center justify-center border ${
+              isChecked ? 'bg-emerald-500 border-emerald-400 text-slate-950 font-bold' : 'border-slate-700 bg-slate-800'
+            }">
+              ${isChecked ? '✓' : ''}
+            </div>
+          </div>
+          <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-800 text-xs">
+            <span class="text-slate-500 font-mono">${isChecked ? t('statusPresent') : t('statusAbsent')}</span>
+            <button onclick="event.stopPropagation(); removePlayer('${p.id}')" class="text-slate-500 hover:text-rose-400 p-1 rounded" title="${t('deletePlayerTooltip')}">
+              🗑️
+            </button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+
+      document.getElementById('checked-in-count').textContent = checkedCount;
+      document.getElementById('total-count').textContent = state.players.length;
+      document.getElementById('pairing-active-count').textContent = checkedCount;
+    }
+
+    function toggleCheckIn(playerId) {
+      const p = state.players.find(x => x.id === playerId);
+      if (p) {
+        p.checkedIn = !p.checkedIn;
+        saveState();
+        renderRoster();
+      }
+    }
+
+    function checkAll(val) {
+      state.players.forEach(p => p.checkedIn = val);
+      saveState();
+      renderRoster();
+    }
+
+    function handleAddPlayer(e) {
+      e.preventDefault();
+      const nameInput = document.getElementById('new-player-name');
+      const tierInput = document.getElementById('new-player-tier');
+      const name = nameInput.value.trim();
+      if (!name) return;
+
+      const newId = 'p_' + Date.now();
+      state.players.push({
+        id: newId,
+        name: name,
+        tier: tierInput.value,
+        checkedIn: true,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        points: 0
+      });
+
+      nameInput.value = '';
+      saveState();
+      renderRoster();
+    }
+
+    function removePlayer(id) {
+      if (confirm(t('confirmDeletePlayer'))) {
+        state.players = state.players.filter(p => p.id !== id);
+        saveState();
+        renderRoster();
+        renderStandings();
+      }
+    }
+
+    function resetRosterToDefault() {
+      if (confirm(t('confirmResetDefault'))) {
+        state.players = JSON.parse(JSON.stringify(DEFAULT_PLAYERS));
+        state.pairings = [];
+        state.byePlayerId = null;
+        state.historyMatches = [];
+        state.currentRound = 1;
+        saveState();
+        renderAll();
+      }
+    }
+
+    // --- Pairing Logic ---
+    function generatePairings() {
+      const activePlayers = state.players.filter(p => p.checkedIn);
+      if (activePlayers.length < 2) {
+        alert(t('atLeastTwoPlayersAlert'));
+        return;
+      }
+
+      const mode = document.getElementById('pairing-mode-select').value;
+      let pool = [...activePlayers];
+      state.byePlayerId = null;
+
+      // Handle odd number of players (Bye)
+      if (pool.length % 2 !== 0) {
+        let byeCandidates = [...pool].sort((a, b) => a.points - b.points);
+        const byePlayer = byeCandidates[0];
+        state.byePlayerId = byePlayer.id;
+        byePlayer.points += 1;
+        byePlayer.wins += 1;
+        pool = pool.filter(p => p.id !== byePlayer.id);
+      }
+
+      let generatedBoards = [];
+
+      if (mode === 'casual') {
+        pool = shuffleArray(pool);
+        generatedBoards = pairWithAvoidance(pool);
+      } else if (mode === 'tier') {
+        const advanced = pool.filter(p => p.tier === 'Advanced');
+        const intermediate = pool.filter(p => p.tier === 'Intermediate');
+        const beginner = pool.filter(p => p.tier === 'Beginner');
+
+        const sortedByTier = [...shuffleArray(advanced), ...shuffleArray(intermediate), ...shuffleArray(beginner)];
+        for (let i = 0; i < sortedByTier.length; i += 2) {
+          if (i + 1 < sortedByTier.length) {
+            generatedBoards.push({
+              board: generatedBoards.length + 1,
+              whiteId: sortedByTier[i].id,
+              blackId: sortedByTier[i + 1].id,
+              result: 'pending'
+            });
+          }
+        }
+      } else if (mode === 'swiss') {
+        pool.sort((a, b) => b.points - a.points);
+        for (let i = 0; i < pool.length; i += 2) {
+          if (i + 1 < pool.length) {
+            generatedBoards.push({
+              board: generatedBoards.length + 1,
+              whiteId: pool[i].id,
+              blackId: pool[i + 1].id,
+              result: 'pending'
+            });
+          }
+        }
+      }
+
+      state.pairings = generatedBoards;
+      saveState();
+      renderPairings();
+      renderStageView();
+
+      resetTimer();
+      alert(t('roundPairingGeneratedMsg', { round: state.currentRound, boards: generatedBoards.length }));
+    }
+
+    function shuffleArray(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function pairWithAvoidance(pool) {
+      const boards = [];
+      const remaining = [...pool];
+
+      let boardIndex = 1;
+      while (remaining.length >= 2) {
+        const p1 = remaining.shift();
+        let partnerIdx = remaining.findIndex(p2 => !hasPlayedBefore(p1.id, p2.id));
+        if (partnerIdx === -1) partnerIdx = 0;
+
+        const p2 = remaining.splice(partnerIdx, 1)[0];
+        boards.push({
+          board: boardIndex++,
+          whiteId: p1.id,
+          blackId: p2.id,
+          result: 'pending'
+        });
+      }
+      return boards;
+    }
+
+    function hasPlayedBefore(id1, id2) {
+      return state.historyMatches.some(m => 
+        (m.p1 === id1 && m.p2 === id2) || (m.p1 === id2 && m.p2 === id1)
+      );
+    }
+
+    function renderPairings() {
+      const container = document.getElementById('pairings-list');
+      container.innerHTML = '';
+
+      const byeBanner = document.getElementById('bye-banner');
+      if (state.byePlayerId) {
+        const byeP = state.players.find(p => p.id === state.byePlayerId);
+        document.getElementById('bye-player-name').textContent = byeP ? byeP.name : '';
+        byeBanner.classList.remove('hidden');
+      } else {
+        byeBanner.classList.add('hidden');
+      }
+
+      if (!state.pairings || state.pairings.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 bg-slate-900/40 rounded-2xl border border-dashed border-slate-800 text-slate-400">
+            <span class="text-3xl block mb-2">♟️</span>
+            ${t('noPairingsYet')}
+          </div>
+        `;
+        return;
+      }
+
+      state.pairings.forEach(board => {
+        const white = state.players.find(p => p.id === board.whiteId) || { name: 'Player' };
+        const black = state.players.find(p => p.id === board.blackId) || { name: 'Player' };
+
+        const row = document.createElement('div');
+        row.className = 'bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-4 shadow-sm';
+
+        row.innerHTML = `
+          <!-- Board Number & Swap -->
+          <div class="flex items-center gap-3 w-32">
+            <span class="px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs font-bold">
+              ${t('boardLabel')} ${board.board}
+            </span>
+            <button onclick="swapColors(${board.board})" class="text-xs p-1 text-slate-400 hover:text-white rounded" title="${t('swapColorsTooltip')}">
+              ⇄
+            </button>
+          </div>
+
+          <!-- Players vs -->
+          <div class="flex-1 flex items-center justify-center gap-4 text-sm font-semibold">
+            <!-- White Player -->
+            <div class="flex items-center gap-2 text-right">
+              <span class="text-slate-100">${white.name}</span>
+              <span class="px-1.5 py-0.5 rounded bg-amber-100 text-slate-900 text-xs font-bold">${t('whiteBadge')}</span>
+            </div>
+
+            <span class="text-xs font-bold text-slate-500 px-2">VS</span>
+
+            <!-- Black Player -->
+            <div class="flex items-center gap-2 text-left">
+              <span class="px-1.5 py-0.5 rounded bg-slate-950 text-slate-200 border border-slate-700 text-xs font-bold">${t('blackBadge')}</span>
+              <span class="text-slate-100">${black.name}</span>
+            </div>
+          </div>
+
+          <!-- Result Buttons -->
+          <div class="flex items-center gap-1.5">
+            <button onclick="setMatchResult(${board.board}, '1-0')" class="px-2.5 py-1 rounded text-xs font-bold border transition ${
+              board.result === '1-0' ? 'bg-emerald-500 text-slate-950 border-emerald-400' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+            }">${t('whiteWonBtn')}</button>
+
+            <button onclick="setMatchResult(${board.board}, '0.5-0.5')" class="px-2.5 py-1 rounded text-xs font-bold border transition ${
+              board.result === '0.5-0.5' ? 'bg-amber-500 text-slate-950 border-amber-400' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+            }">${t('drawBtn')}</button>
+
+            <button onclick="setMatchResult(${board.board}, '0-1')" class="px-2.5 py-1 rounded text-xs font-bold border transition ${
+              board.result === '0-1' ? 'bg-emerald-500 text-slate-950 border-emerald-400' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+            }">${t('blackWonBtn')}</button>
+
+            <button onclick="setMatchResult(${board.board}, 'pending')" class="px-2 py-1 rounded text-xs text-slate-500 hover:text-slate-300 transition" title="${t('clearResultTitle')}">
+              ✕
+            </button>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function swapColors(boardNum) {
+      const b = state.pairings.find(x => x.board === boardNum);
+      if (b) {
+        const tmp = b.whiteId;
+        b.whiteId = b.blackId;
+        b.blackId = tmp;
+        saveState();
+        renderPairings();
+        renderStageView();
+      }
+    }
+
+    function setMatchResult(boardNum, res) {
+      const b = state.pairings.find(x => x.board === boardNum);
+      if (!b) return;
+
+      b.result = res;
+      recalculateAllScores();
+      saveState();
+      renderPairings();
+      renderStandings();
+      renderStageView();
+    }
+
+    function recalculateAllScores() {
+      state.players.forEach(p => {
+        p.wins = 0;
+        p.draws = 0;
+        p.losses = 0;
+        p.points = 0;
+      });
+
+      state.historyMatches.forEach(m => {
+        const p1 = state.players.find(p => p.id === m.p1);
+        const p2 = state.players.find(p => p.id === m.p2);
+        if (m.result === '1-0') {
+          if (p1) { p1.wins++; p1.points += 1; }
+          if (p2) { p2.losses++; }
+        } else if (m.result === '0-1') {
+          if (p2) { p2.wins++; p2.points += 1; }
+          if (p1) { p1.losses++; }
+        } else if (m.result === '0.5-0.5') {
+          if (p1) { p1.draws++; p1.points += 0.5; }
+          if (p2) { p2.draws++; p2.points += 0.5; }
+        }
+      });
+
+      state.pairings.forEach(m => {
+        const white = state.players.find(p => p.id === m.whiteId);
+        const black = state.players.find(p => p.id === m.blackId);
+        if (m.result === '1-0') {
+          if (white) { white.wins++; white.points += 1; }
+          if (black) { black.losses++; }
+        } else if (m.result === '0-1') {
+          if (black) { black.wins++; black.points += 1; }
+          if (white) { white.losses++; }
+        } else if (m.result === '0.5-0.5') {
+          if (white) { white.draws++; white.points += 0.5; }
+          if (black) { black.draws++; black.points += 0.5; }
+        }
+      });
+
+      if (state.byePlayerId) {
+        const bp = state.players.find(p => p.id === state.byePlayerId);
+        if (bp) {
+          bp.wins++;
+          bp.points += 1;
+        }
+      }
+    }
+
+    function nextRound() {
+      const unfinished = state.pairings.filter(p => p.result === 'pending');
+      if (unfinished.length > 0) {
+        if (!confirm(t('unfinishedGamesWarning', { round: state.currentRound, unfinished: unfinished.length }))) {
+          return;
+        }
+      }
+
+      state.pairings.forEach(b => {
+        state.historyMatches.push({
+          round: state.currentRound,
+          p1: b.whiteId,
+          p2: b.blackId,
+          result: b.result
+        });
+      });
+
+      state.currentRound++;
+      state.pairings = [];
+      state.byePlayerId = null;
+
+      saveState();
+      renderAll();
+      alert(t('nextRoundSuccessMsg', { round: state.currentRound }));
+    }
+
+    // --- Standings & Leaderboard ---
+    function renderStandings() {
+      const tbody = document.getElementById('standings-table-body');
+      tbody.innerHTML = '';
+
+      const sorted = [...state.players].sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points;
+        return b.wins - a.wins;
+      });
+
+      sorted.forEach((p, idx) => {
+        const totalGames = p.wins + p.draws + p.losses;
+        const winRate = totalGames > 0 ? ((p.wins / totalGames) * 100).toFixed(0) + '%' : '-';
+
+        let rankBadge = `<span class="font-bold text-slate-400">${idx + 1}</span>`;
+        if (idx === 0) rankBadge = `<span class="text-xl">🥇</span>`;
+        if (idx === 1) rankBadge = `<span class="text-xl">🥈</span>`;
+        if (idx === 2) rankBadge = `<span class="text-xl">🥉</span>`;
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/40 transition';
+        tr.innerHTML = `
+          <td class="py-3 px-4 text-center">${rankBadge}</td>
+          <td class="py-3 px-4 font-bold text-slate-100">${p.name}</td>
+          <td class="py-3 px-4 text-xs text-slate-400">${p.tier}</td>
+          <td class="py-3 px-4 text-center font-mono">${totalGames}</td>
+          <td class="py-3 px-4 text-center font-mono text-xs">
+            <span class="text-emerald-400">${p.wins}</span> / 
+            <span class="text-amber-400">${p.draws}</span> / 
+            <span class="text-rose-400">${p.losses}</span>
+          </td>
+          <td class="py-3 px-4 text-center font-mono font-bold text-base text-amber-400">${p.points}</td>
+          <td class="py-3 px-4 text-center font-mono text-xs text-slate-300">${winRate}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function celebrateWinners() {
+      try {
+        if (window.confetti) {
+          confetti({
+            particleCount: 120,
+            spread: 80,
+            origin: { y: 0.6 }
+          });
+        }
+      } catch (e) {}
+      alert(t('celebrateAlert'));
+    }
+
+    // --- Big Screen View Rendering ---
+    function renderStageView() {
+      document.getElementById('stage-round-label').textContent = (state.lang === 'zh') 
+        ? `第 ${state.currentRound} 輪 (Round ${state.currentRound})` 
+        : `Round ${state.currentRound}`;
+      document.getElementById('stage-board-count').textContent = state.pairings.length;
+
+      const grid = document.getElementById('stage-pairings-grid');
+      grid.innerHTML = '';
+
+      if (state.pairings.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full text-center py-16 bg-slate-900/60 rounded-3xl border border-slate-800 text-slate-400">
+            <span class="text-5xl block mb-3">♟️</span>
+            <div class="text-2xl font-bold text-slate-200">${t('stagePreparing')}</div>
+            <p class="text-sm mt-1">${t('stagePreparingDesc')}</p>
+          </div>
+        `;
+        return;
+      }
+
+      state.pairings.forEach(board => {
+        const white = state.players.find(p => p.id === board.whiteId) || { name: 'Player' };
+        const black = state.players.find(p => p.id === board.blackId) || { name: 'Player' };
+
+        let resultBadge = `<span class="text-xs text-slate-400 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">${t('stageStatusInProgress')}</span>`;
+        if (board.result === '1-0') resultBadge = `<span class="text-xs font-bold text-emerald-300 bg-emerald-500/20 px-3 py-1 rounded-full border border-emerald-500/40">${t('whiteWonBtn')}</span>`;
+        if (board.result === '0-1') resultBadge = `<span class="text-xs font-bold text-emerald-300 bg-emerald-500/20 px-3 py-1 rounded-full border border-emerald-500/40">${t('blackWonBtn')}</span>`;
+        if (board.result === '0.5-0.5') resultBadge = `<span class="text-xs font-bold text-amber-300 bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/40">${t('drawBtn')}</span>`;
+
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900/90 border border-slate-800 p-6 rounded-3xl shadow-xl flex flex-col justify-between';
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-base font-black px-3 py-1 rounded-xl bg-amber-500 text-slate-950 shadow-md">
+              TABLE ${board.board}
+            </span>
+            ${resultBadge}
+          </div>
+
+          <div class="space-y-4 my-2">
+            <!-- White Player Card -->
+            <div class="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+              <div class="flex items-center gap-3">
+                <span class="w-9 h-9 rounded-xl bg-amber-100 text-slate-900 flex items-center justify-center font-bold text-xl shadow">♔</span>
+                <span class="text-xl font-bold text-white tracking-wide">${white.name}</span>
+              </div>
+              <span class="text-xs text-slate-400 font-mono">${t('stageWhiteSide')}</span>
+            </div>
+
+            <!-- Black Player Card -->
+            <div class="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+              <div class="flex items-center gap-3">
+                <span class="w-9 h-9 rounded-xl bg-slate-800 text-slate-100 border border-slate-600 flex items-center justify-center font-bold text-xl shadow">♚</span>
+                <span class="text-xl font-bold text-white tracking-wide">${black.name}</span>
+              </div>
+              <span class="text-xs text-slate-400 font-mono">${t('stageBlackSide')}</span>
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-800/80 text-center text-xs text-slate-400">
+            ${t('stagePleaseTakeSeat')} ${board.board}
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    // --- Chess Puzzles Viewer ---
+    function renderCurrentPuzzle() {
+      const lang = state.lang || 'en';
+      const list = PUZZLE_DATA[lang] || PUZZLE_DATA['en'];
+      const p = list[currentPuzzleIndex] || list[0];
+
+      document.getElementById('puzzle-index-label').textContent = `${currentPuzzleIndex + 1} / ${list.length}`;
+      document.getElementById('puzzle-title').textContent = p.title;
+      document.getElementById('puzzle-desc').textContent = p.desc;
+
+      const boardContainer = document.getElementById('chessboard-container');
+      boardContainer.innerHTML = '';
+
+      const gridEl = document.createElement('div');
+      gridEl.className = 'chess-grid-board';
+
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const sq = document.createElement('div');
+          const isLight = (r + c) % 2 === 0;
+          sq.className = isLight ? 'board-sq-w' : 'board-sq-b';
+          sq.textContent = p.board[r][c] || '';
+          gridEl.appendChild(sq);
+        }
+      }
+      boardContainer.appendChild(gridEl);
+
+      document.getElementById('puzzle-hint-box').classList.add('hidden');
+      document.getElementById('puzzle-hint-box').textContent = p.hint;
+      document.getElementById('puzzle-solution-box').classList.add('hidden');
+      document.getElementById('puzzle-solution-box').textContent = p.solution;
+    }
+
+    function nextPuzzle() {
+      const list = PUZZLE_DATA[state.lang] || PUZZLE_DATA['en'];
+      currentPuzzleIndex = (currentPuzzleIndex + 1) % list.length;
+      renderCurrentPuzzle();
+    }
+
+    function prevPuzzle() {
+      const list = PUZZLE_DATA[state.lang] || PUZZLE_DATA['en'];
+      currentPuzzleIndex = (currentPuzzleIndex - 1 + list.length) % list.length;
+      renderCurrentPuzzle();
+    }
+
+    function togglePuzzleHint() {
+      const box = document.getElementById('puzzle-hint-box');
+      box.classList.toggle('hidden');
+    }
+
+    function togglePuzzleSolution() {
+      const box = document.getElementById('puzzle-solution-box');
+      box.classList.toggle('hidden');
+    }
+
+    // --- Export & Import ---
+    function exportData() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+      const dlAnchorElem = document.createElement('a');
+      dlAnchorElem.setAttribute("href", dataStr);
+      dlAnchorElem.setAttribute("download", `chess_club_meetup_r${state.currentRound}.json`);
+      dlAnchorElem.click();
+    }
+
+    function importData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (parsed && parsed.players) {
+            state = parsed;
+            saveState();
+            applyLanguage();
+            alert(t('importSuccessAlert'));
+          } else {
+            alert(t('importInvalidAlert'));
+          }
+        } catch (err) {
+          alert(t('importFailedAlert'));
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // --- Render All Viewports ---
+    function renderAll() {
+      document.getElementById('nav-round-badge').textContent = (state.lang === 'zh')
+        ? `第 ${state.currentRound} 輪 (Round ${state.currentRound})`
+        : `Round ${state.currentRound}`;
+      updateTimerDisplays();
+      renderRoster();
+      renderPairings();
+      renderStandings();
+      renderStageView();
+    }
+
+    // Edit club title
+    document.getElementById('club-title').addEventListener('click', () => {
+      const newName = prompt(t('editClubNameTooltip'), state.clubName);
+      if (newName && newName.trim()) {
+        state.clubName = newName.trim();
+        document.getElementById('club-title').textContent = state.clubName;
+        saveState();
+      }
+    });
+
+    // --- Init ---
+    window.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      document.getElementById('club-title').textContent = state.clubName;
+      applyLanguage();
+    });
+  </script>
+</body>
+</html>
